@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import ImageMaskCanvas from './ImageMaskCanvas';
+import {
+  Container, Box, Typography, TextField, Slider, Button, Select, MenuItem, RadioGroup, FormControl, FormLabel, FormControlLabel, Radio, Grid, Divider
+} from '@mui/material';
 import './App.css';
 
 const SAMPLERS = [
@@ -41,8 +44,6 @@ function App() {
   const [batchSize, setBatchSize] = useState(1);
   const [width, setWidth] = useState(512);
   const [height, setHeight] = useState(512);
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [resizeMode, setResizeMode] = useState(0);
   const [maskBlur, setMaskBlur] = useState(4);
   const [maskMode, setMaskMode] = useState(0);
@@ -51,7 +52,9 @@ function App() {
   const [inpaintPadding, setInpaintPadding] = useState(32);
   const [seed, setSeed] = useState(-1);
   const [brushSize, setBrushSize] = useState(32);
-  const [maskKey, setMaskKey] = useState(0); // для сброса маски
+  const [maskKey, setMaskKey] = useState(0);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -67,7 +70,7 @@ function App() {
   };
 
   const handleClearMask = () => {
-    setMaskKey(prev => prev + 1); // сбросить компонент маски
+    setMaskKey(prev => prev + 1);
   };
 
   const handleSubmit = async (e) => {
@@ -75,7 +78,6 @@ function App() {
     setLoading(true);
     setResult(null);
     const formData = new FormData();
-    // Преобразуем base64 в Blob
     function dataURLtoBlob(dataurl) {
       var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
       while(n--){
@@ -122,119 +124,127 @@ function App() {
   };
 
   return (
-    <div className="App">
-      <h2>Инпейнтинг Stable Diffusion</h2>
-      <input type="file" accept="image/*" onChange={handleImageChange} />
+    <Container maxWidth="sm" sx={{ py: 4 }}>
+      <Typography variant="h4" align="center" gutterBottom>Inpainter</Typography>
+      <Box sx={{ mb: 2 }}>
+        <Button variant="contained" component="label" fullWidth>
+          Загрузить изображение
+          <input type="file" accept="image/*" hidden onChange={handleImageChange} />
+        </Button>
+      </Box>
       {image && (
         <>
-          <div style={{margin:'10px 0'}}>
-            <label>Толщина кисти: <input type="range" min={4} max={128} value={brushSize} onChange={e=>setBrushSize(Number(e.target.value))} /></label> {brushSize}
-            <button type="button" onClick={handleClearMask} style={{marginLeft:12}}>Очистить маску</button>
-          </div>
-          <ImageMaskCanvas key={maskKey} image={image} onMaskChange={handleMaskChange} brushSize={brushSize} />
+          <Box sx={{ mb: 2, textAlign: 'center' }}>
+            <Typography variant="subtitle1">Маска</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mb: 1 }}>
+              <Typography variant="body2">Толщина кисти</Typography>
+              <Slider min={4} max={128} value={brushSize} onChange={e=>setBrushSize(Number(e.target.value))} sx={{ width: 120 }} />
+              <Typography variant="body2">{brushSize}</Typography>
+              <Button size="small" variant="outlined" onClick={handleClearMask}>Очистить</Button>
+            </Box>
+            <ImageMaskCanvas key={maskKey} image={image} onMaskChange={handleMaskChange} brushSize={brushSize} />
+          </Box>
+          <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
+            <Typography variant="h6" gutterBottom>Параметры генерации</Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField label="Позитивный промпт" value={prompt} onChange={e=>setPrompt(e.target.value)} fullWidth size="small" margin="dense" />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField label="Негативный промпт" value={negativePrompt} onChange={e=>setNegativePrompt(e.target.value)} fullWidth size="small" margin="dense" />
+              </Grid>
+              <Grid item xs={6}>
+                <FormControl fullWidth size="small">
+                  <FormLabel>Sampler</FormLabel>
+                  <Select value={sampler} onChange={e=>setSampler(e.target.value)}>
+                    {SAMPLERS.map(s=><MenuItem key={s} value={s}>{s}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={6}>
+                <FormControl fullWidth size="small">
+                  <FormLabel>Schedule</FormLabel>
+                  <Select value={schedule} onChange={e=>setSchedule(e.target.value)}>
+                    {SCHEDULES.map(s=><MenuItem key={s} value={s}>{s}</MenuItem>)}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={4}><TextField label="Steps" type="number" value={steps} onChange={e=>setSteps(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid item xs={4}><TextField label="CFG" type="number" value={cfgScale} onChange={e=>setCfgScale(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid item xs={4}><TextField label="Denoising" type="number" value={denoising} onChange={e=>setDenoising(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid item xs={6}><TextField label="Batch count" type="number" value={batchCount} onChange={e=>setBatchCount(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid item xs={6}><TextField label="Batch size" type="number" value={batchSize} onChange={e=>setBatchSize(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid item xs={6}><TextField label="Width" type="number" value={width} onChange={e=>setWidth(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid item xs={6}><TextField label="Height" type="number" value={height} onChange={e=>setHeight(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid item xs={12}><Divider sx={{ my: 1 }} /></Grid>
+              <Grid item xs={12}>
+                <FormControl component="fieldset">
+                  <FormLabel>Resize mode</FormLabel>
+                  <RadioGroup row value={resizeMode} onChange={e=>setResizeMode(Number(e.target.value))}>
+                    {RESIZE_MODES.map(opt => (
+                      <FormControlLabel key={opt.value} value={opt.value} control={<Radio />} label={opt.label} />
+                    ))}
+                  </RadioGroup>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography gutterBottom>Mask blur: {maskBlur}</Typography>
+                <Slider min={0} max={64} value={maskBlur} onChange={e=>setMaskBlur(Number(e.target.value))} />
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl component="fieldset">
+                  <FormLabel>Mask mode</FormLabel>
+                  <RadioGroup row value={maskMode} onChange={e=>setMaskMode(Number(e.target.value))}>
+                    {MASK_MODES.map(opt => (
+                      <FormControlLabel key={opt.value} value={opt.value} control={<Radio />} label={opt.label} />
+                    ))}
+                  </RadioGroup>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl component="fieldset">
+                  <FormLabel>Masked content</FormLabel>
+                  <RadioGroup row value={maskedContent} onChange={e=>setMaskedContent(Number(e.target.value))}>
+                    {MASKED_CONTENTS.map(opt => (
+                      <FormControlLabel key={opt.value} value={opt.value} control={<Radio />} label={opt.label} />
+                    ))}
+                  </RadioGroup>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <FormControl component="fieldset">
+                  <FormLabel>Inpaint area</FormLabel>
+                  <RadioGroup row value={inpaintArea} onChange={e=>setInpaintArea(e.target.value === 'true')}>
+                    {INPAINT_AREAS.map(opt => (
+                      <FormControlLabel key={opt.label} value={opt.value.toString()} control={<Radio />} label={opt.label} />
+                    ))}
+                  </RadioGroup>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12}>
+                <Typography gutterBottom>Only masked padding, pixels: {inpaintPadding}</Typography>
+                <Slider min={0} max={128} value={inpaintPadding} onChange={e=>setInpaintPadding(Number(e.target.value))} />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField label="Seed" type="number" value={seed} onChange={e=>setSeed(Number(e.target.value))} size="small" fullWidth helperText="-1 для случайного" />
+              </Grid>
+              <Grid item xs={12}>
+                <Button type="submit" variant="contained" color="primary" fullWidth disabled={!image || !mask || !prompt || loading} sx={{ mt: 2 }}>
+                  {loading ? 'Генерация...' : 'Отправить на инпейнтинг'}
+                </Button>
+              </Grid>
+            </Grid>
+          </Box>
         </>
       )}
-      <form onSubmit={handleSubmit} style={{marginTop: 20}}>
-        <input
-          type="text"
-          placeholder="Позитивный промпт..."
-          value={prompt}
-          onChange={e => setPrompt(e.target.value)}
-          style={{ width: '80%', margin: '10px 0' }}
-        />
-        <input
-          type="text"
-          placeholder="Негативный промпт..."
-          value={negativePrompt}
-          onChange={e => setNegativePrompt(e.target.value)}
-          style={{ width: '80%', margin: '10px 0' }}
-        />
-        <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
-          <label>Sampler:
-            <select value={sampler} onChange={e=>setSampler(e.target.value)}>
-              {SAMPLERS.map(s=><option key={s} value={s}>{s}</option>)}
-            </select>
-          </label>
-          <label>Schedule:
-            <select value={schedule} onChange={e=>setSchedule(e.target.value)}>
-              {SCHEDULES.map(s=><option key={s} value={s}>{s}</option>)}
-            </select>
-          </label>
-          <label>Steps:
-            <input type="number" min={1} max={150} value={steps} onChange={e=>setSteps(Number(e.target.value))} style={{width:60}}/>
-          </label>
-          <label>CFG:
-            <input type="number" min={1} max={30} step={0.1} value={cfgScale} onChange={e=>setCfgScale(Number(e.target.value))} style={{width:60}}/>
-          </label>
-          <label>Denoising:
-            <input type="number" min={0.1} max={1} step={0.01} value={denoising} onChange={e=>setDenoising(Number(e.target.value))} style={{width:60}}/>
-          </label>
-          <label>Batch count:
-            <input type="number" min={1} max={16} value={batchCount} onChange={e=>setBatchCount(Number(e.target.value))} style={{width:60}}/>
-          </label>
-          <label>Batch size:
-            <input type="number" min={1} max={8} value={batchSize} onChange={e=>setBatchSize(Number(e.target.value))} style={{width:60}}/>
-          </label>
-          <label>Width:
-            <input type="number" min={64} max={2048} step={8} value={width} onChange={e=>setWidth(Number(e.target.value))} style={{width:60}}/>
-          </label>
-          <label>Height:
-            <input type="number" min={64} max={2048} step={8} value={height} onChange={e=>setHeight(Number(e.target.value))} style={{width:60}}/>
-          </label>
-        </div>
-        <div style={{margin:'10px 0'}}>
-          <div>Resize mode:</div>
-          {RESIZE_MODES.map(opt => (
-            <label key={opt.value} style={{marginRight:8}}>
-              <input type="radio" name="resizeMode" value={opt.value} checked={resizeMode===opt.value} onChange={()=>setResizeMode(opt.value)} /> {opt.label}
-            </label>
-          ))}
-        </div>
-        <div style={{margin:'10px 0'}}>
-          <label>Mask blur: <input type="range" min={0} max={64} value={maskBlur} onChange={e=>setMaskBlur(Number(e.target.value))} /></label> {maskBlur}
-        </div>
-        <div style={{margin:'10px 0'}}>
-          <div>Mask mode:</div>
-          {MASK_MODES.map(opt => (
-            <label key={opt.value} style={{marginRight:8}}>
-              <input type="radio" name="maskMode" value={opt.value} checked={maskMode===opt.value} onChange={()=>setMaskMode(opt.value)} /> {opt.label}
-            </label>
-          ))}
-        </div>
-        <div style={{margin:'10px 0'}}>
-          <div>Masked content:</div>
-          {MASKED_CONTENTS.map(opt => (
-            <label key={opt.value} style={{marginRight:8}}>
-              <input type="radio" name="maskedContent" value={opt.value} checked={maskedContent===opt.value} onChange={()=>setMaskedContent(opt.value)} /> {opt.label}
-            </label>
-          ))}
-        </div>
-        <div style={{margin:'10px 0'}}>
-          <div>Inpaint area:</div>
-          {INPAINT_AREAS.map(opt => (
-            <label key={opt.label} style={{marginRight:8}}>
-              <input type="radio" name="inpaintArea" value={opt.value ? 'true' : 'false'} checked={inpaintArea===opt.value} onChange={()=>setInpaintArea(opt.value)} /> {opt.label}
-            </label>
-          ))}
-        </div>
-        <div style={{margin:'10px 0'}}>
-          <label>Only masked padding, pixels: <input type="range" min={0} max={128} value={inpaintPadding} onChange={e=>setInpaintPadding(Number(e.target.value))} /></label> {inpaintPadding}
-        </div>
-        <label>Seed:
-          <input type="number" value={seed} onChange={e=>setSeed(Number(e.target.value))} style={{width:100, marginLeft:8}} />
-          <span style={{marginLeft:8, fontSize:12, color:'#888'}}>(-1 для случайного)</span>
-        </label>
-        <button type="submit" disabled={!image || !mask || !prompt || loading} style={{marginTop:12}}>
-          {loading ? 'Генерация...' : 'Отправить на инпейнтинг'}
-        </button>
-      </form>
       {result && (
-        <div style={{marginTop:20}}>
-          <h3>Результат:</h3>
-          <img src={`data:image/png;base64,${result}`} alt="result" style={{maxWidth:400}}/>
-        </div>
+        <Box sx={{ mt: 4, textAlign: 'center' }}>
+          <Typography variant="h6">Результат</Typography>
+          <img src={`data:image/png;base64,${result}`} alt="result" style={{maxWidth: '100%', borderRadius: 8, margin: '16px 0'}} />
+          {/* Здесь будет кнопка для отправки в Telegram */}
+        </Box>
       )}
-    </div>
+    </Container>
   );
 }
 
