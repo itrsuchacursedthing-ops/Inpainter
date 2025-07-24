@@ -56,6 +56,8 @@ function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const BACKEND_URL = 'https://pretty-mangos-study.loca.lt';
+
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -106,7 +108,7 @@ function App() {
     formData.append('inpaint_full_res_padding', inpaintPadding);
     formData.append('seed', seed);
     try {
-      const resp = await fetch('http://localhost:8000/inpaint', {
+      const resp = await fetch(`${BACKEND_URL}/inpaint`, {
         method: 'POST',
         body: formData
       });
