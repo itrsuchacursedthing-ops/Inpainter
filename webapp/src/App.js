@@ -56,7 +56,7 @@ function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const BACKEND_URL = 'https://icy-ads-yell.loca.lt';
+  const BACKEND_URL = 'https://northerly-venerated-hyrax.cloudpub.ru/';
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
