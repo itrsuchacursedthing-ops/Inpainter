@@ -491,7 +491,7 @@ def process_img2img(message):
 @bot.message_handler(commands=['webapp'])
 def send_webapp(message):
     bot.send_message(message.chat.id, "fff")
-    webapp_url = "https://your-app-name.vercel.app/"  # замени на свой URL!
+    webapp_url = "https://itrsuchacursedthing-ops.github.io/Inpainter/"
     markup = InlineKeyboardMarkup()
     markup.add(
         InlineKeyboardButton("Открыть Web App", web_app=WebAppInfo(url=webapp_url))
