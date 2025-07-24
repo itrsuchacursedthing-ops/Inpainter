@@ -2,6 +2,7 @@
   "name": "webapp",
   "version": "0.1.0",
   "private": true,
+  "homepage": "https://itrsuchacursedthing-ops.github.io/Inpainter",
   "dependencies": {
     "cra-template-pwa": "2.0.0",
     "react": "^19.1.0",
