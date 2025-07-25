@@ -1,0 +1,16 @@
+{
+  "files": {
+    "main.css": "/Inpainter/static/css/main.095709f7.css",
+    "main.js": "/Inpainter/static/js/main.2ccbe0d1.js",
+    "static/js/488.13ed2434.chunk.js": "/Inpainter/static/js/488.13ed2434.chunk.js",
+    "service-worker.js": "/Inpainter/service-worker.js",
+    "index.html": "/Inpainter/index.html",
+    "main.095709f7.css.map": "/Inpainter/static/css/main.095709f7.css.map",
+    "main.2ccbe0d1.js.map": "/Inpainter/static/js/main.2ccbe0d1.js.map",
+    "488.13ed2434.chunk.js.map": "/Inpainter/static/js/488.13ed2434.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.095709f7.css",
+    "static/js/main.2ccbe0d1.js"
+  ]
+}
