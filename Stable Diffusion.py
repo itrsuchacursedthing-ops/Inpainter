@@ -488,9 +488,8 @@ def process_img2img(message):
                 pass
 
 
-@bot.message_handler(commands=['webapp'])
+@bot.message_handler(commands=['inpaint'])
 def send_webapp(message):
-    bot.send_message(message.chat.id, "fff")
     webapp_url = "https://itrsuchacursedthing-ops.github.io/Inpainter/"
     markup = InlineKeyboardMarkup()
     markup.add(
