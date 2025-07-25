@@ -1,4 +1,4 @@
-from fastapi import FastAPI, File, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import requests
@@ -18,17 +18,25 @@ app.add_middleware(
 
 SD_API_URL = "http://127.0.0.1:7860/sdapi/v1/img2img"
 
+@app.get("/progress")
+def get_progress():
+    try:
+        resp = requests.get("http://127.0.0.1:7860/sdapi/v1/progress")
+        return resp.json()
+    except Exception as e:
+        return {"progress": 0}
+
 @app.post("/inpaint")
 async def inpaint(
     image: UploadFile = File(...),
     mask: UploadFile = File(...),
     prompt: str = Form(...),
-    negative_prompt: str = Form("(deformed, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation"),
+    negative_prompt: str = Form("(deformed, sfw, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation"),
     sampler_name: str = Form("Euler a"),
     schedule_type: str = Form("Karras"),
     steps: int = Form(50),
     cfg_scale: float = Form(5.0),
-    denoising_strength: float = Form(0.75),
+    denoising_strength: float = Form(0.69),
     seed: int = Form(-1),
     width: int = Form(1024),
     height: int = Form(1024),
@@ -78,4 +86,20 @@ async def inpaint(
         # result['images'] — список base64 изображений
         return JSONResponse({"images": result.get('images', [])})
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500) 
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+TELEGRAM_BOT_TOKEN = "7759869868:AAF1HKa0mCFP4q7Y9uxfqUm3F08bmmvUlSM"
+
+@app.post("/send_to_telegram")
+async def send_to_telegram(request: Request):
+    data = await request.json()
+    chat_id = data["chat_id"]
+    image_b64 = data["image"]
+    image_bytes = base64.b64decode(image_b64)
+    files = {'document': ('inpaint_result.png', image_bytes, 'image/png')}
+    resp = requests.post(
+        f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument",
+        data={'chat_id': chat_id},
+        files=files
+    )
+    return {"ok": resp.ok} 

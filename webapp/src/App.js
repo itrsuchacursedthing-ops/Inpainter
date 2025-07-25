@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import ImageMaskCanvas from './ImageMaskCanvas';
 import {
   Container, Box, Typography, TextField, Slider, Button, Select, MenuItem, RadioGroup, FormControl, FormLabel, FormControlLabel, Radio, Grid, Divider
@@ -30,16 +30,19 @@ const INPAINT_AREAS = [
   { label: 'Only masked', value: false }
 ];
 
+const tg = window.Telegram?.WebApp;
+const chat_id = tg?.initDataUnsafe?.user?.id;
+
 function App() {
   const [image, setImage] = useState(null);
   const [prompt, setPrompt] = useState('');
-  const [negativePrompt, setNegativePrompt] = useState('(deformed, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation');
+  const [negativePrompt, setNegativePrompt] = useState('(deformed, sfw, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation');
   const [mask, setMask] = useState(null);
   const [sampler, setSampler] = useState('Euler a');
   const [schedule, setSchedule] = useState('Karras');
   const [steps, setSteps] = useState(50);
   const [cfgScale, setCfgScale] = useState(5.0);
-  const [denoising, setDenoising] = useState(0.75);
+  const [denoising, setDenoising] = useState(0.69);
   const [batchCount, setBatchCount] = useState(1);
   const [batchSize, setBatchSize] = useState(1);
   const [width, setWidth] = useState(1024);
@@ -55,6 +58,10 @@ function App() {
   const [maskKey, setMaskKey] = useState(0);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState(null);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  let progressInterval = null;
 
   const BACKEND_URL = 'https://pliantly-key-drum.cloudpub.ru';
 
@@ -75,10 +82,29 @@ function App() {
     setMaskKey(prev => prev + 1);
   };
 
+  const startProgressPolling = () => {
+    progressInterval = setInterval(async () => {
+      try {
+        const resp = await fetch(`${BACKEND_URL}/progress`);
+        const data = await resp.json();
+        setProgress(Math.round((data.progress || 0) * 100));
+      } catch {
+        setProgress(null);
+      }
+    }, 1000);
+  };
+
+  const stopProgressPolling = () => {
+    clearInterval(progressInterval);
+    setProgress(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setResult(null);
+    setProgress(0);
+    startProgressPolling();
     const formData = new FormData();
     function dataURLtoBlob(dataurl) {
       var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
@@ -123,6 +149,28 @@ function App() {
       alert('Ошибка: ' + err);
     }
     setLoading(false);
+    stopProgressPolling();
+  };
+
+  const handleSendToTelegram = async () => {
+    if (!result || !chat_id) return;
+    setSending(true);
+    setSent(false);
+    try {
+      await fetch(`${BACKEND_URL}/send_to_telegram`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id,
+          image: result
+        })
+      });
+      setSent(true);
+    } catch {
+      setSent(false);
+      alert('Ошибка отправки в Telegram');
+    }
+    setSending(false);
   };
 
   return (
@@ -232,7 +280,7 @@ function App() {
               </Grid>
               <Grid item xs={12}>
                 <Button type="submit" variant="contained" color="primary" fullWidth disabled={!image || !mask || !prompt || loading} sx={{ mt: 2 }}>
-                  {loading ? 'Генерация...' : 'Отправить на инпейнтинг'}
+                  {loading ? `Генерация...${progress !== null ? ` ${progress}%` : ''}` : 'Отправить на инпейнтинг'}
                 </Button>
               </Grid>
             </Grid>
@@ -245,13 +293,28 @@ function App() {
           <img src={`data:image/png;base64,${result}`} alt="result" style={{maxWidth: '100%', borderRadius: 8, margin: '16px 0'}} />
           <Button
             variant="outlined"
-            sx={{ mt: 2 }}
+            sx={{ mt: 2, mr: 2 }}
             component="a"
             href={`data:image/png;base64,${result}`}
             download="inpaint_result.png"
           >
             Скачать изображение
           </Button>
+          {chat_id && (
+            <Button
+              variant="contained"
+              sx={{ mt: 2 }}
+              onClick={handleSendToTelegram}
+              disabled={sending}
+            >
+              {sending ? 'Отправка...' : sent ? 'Отправлено!' : 'Отправить в Telegram'}
+            </Button>
+          )}
+          {!chat_id && (
+            <Typography variant="body2" sx={{ mt: 1, color: '#aaa' }}>
+              Для отправки в Telegram откройте Web App через кнопку в боте
+            </Typography>
+          )}
         </Box>
       )}
     </Container>
