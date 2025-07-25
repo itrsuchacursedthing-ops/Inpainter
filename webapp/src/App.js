@@ -243,7 +243,15 @@ function App() {
         <Box sx={{ mt: 4, textAlign: 'center' }}>
           <Typography variant="h6">Результат</Typography>
           <img src={`data:image/png;base64,${result}`} alt="result" style={{maxWidth: '100%', borderRadius: 8, margin: '16px 0'}} />
-          {/* Здесь будет кнопка для отправки в Telegram */}
+          <Button
+            variant="outlined"
+            sx={{ mt: 2 }}
+            component="a"
+            href={`data:image/png;base64,${result}`}
+            download="inpaint_result.png"
+          >
+            Скачать изображение
+          </Button>
         </Box>
       )}
     </Container>

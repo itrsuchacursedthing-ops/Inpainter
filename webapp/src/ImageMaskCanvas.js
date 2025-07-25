@@ -61,7 +61,7 @@ function ImageMaskCanvas({ image, onMaskChange, brushSize = 32 }) {
   };
   const draw = (from, to) => {
     const ctx = maskRef.current.getContext('2d');
-    ctx.globalAlpha = 1.0;
+    ctx.globalAlpha = 1.0; // всегда полностью белый для маски
     ctx.strokeStyle = 'white';
     ctx.lineWidth = brushSize;
     ctx.lineCap = 'round';
@@ -97,15 +97,15 @@ function ImageMaskCanvas({ image, onMaskChange, brushSize = 32 }) {
         ref={maskRef}
         width={imgSize.width}
         height={imgSize.height}
-        style={{ position: 'absolute', left: 0, top: 0, zIndex: 2, pointerEvents: 'auto', width: imgSize.width * scale, height: imgSize.height * scale }}
+        style={{ position: 'absolute', left: 0, top: 0, zIndex: 2, pointerEvents: 'auto', width: imgSize.width * scale, height: imgSize.height * scale, opacity: 0.4 }}
         onMouseDown={startDraw}
         onMouseUp={endDraw}
         onMouseOut={endDraw}
         onMouseMove={handleMove}
-        onTouchStart={startDraw}
-        onTouchEnd={endDraw}
-        onTouchCancel={endDraw}
-        onTouchMove={handleMove}
+        onTouchStart={e => { e.preventDefault(); startDraw(e); }}
+        onTouchEnd={e => { e.preventDefault(); endDraw(e); }}
+        onTouchCancel={e => { e.preventDefault(); endDraw(e); }}
+        onTouchMove={e => { e.preventDefault(); handleMove(e); }}
         tabIndex={-1}
         aria-label="mask"
       />

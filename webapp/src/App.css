@@ -6,6 +6,10 @@ body {
   padding: 0;
 }
 
+canvas {
+  touch-action: none;
+}
+
 .App, .MuiContainer-root {
   background: #23272f;
   border-radius: 16px;
