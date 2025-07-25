@@ -1,41 +1,49 @@
 import React, { useRef, useEffect, useState } from 'react';
 
-const CANVAS_WIDTH = 512;
-const CANVAS_HEIGHT = 512;
-
 function ImageMaskCanvas({ image, onMaskChange, brushSize = 32 }) {
-  const imgRef = useRef();
   const canvasRef = useRef();
   const maskRef = useRef();
   const [drawing, setDrawing] = useState(false);
   const [lastPos, setLastPos] = useState(null);
+  const [imgSize, setImgSize] = useState({ width: 512, height: 512 });
 
+  // Определяем размер изображения при загрузке нового файла
   useEffect(() => {
-    const ctx = canvasRef.current.getContext('2d');
     const img = new window.Image();
     img.src = image;
     img.onload = () => {
-      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-      ctx.drawImage(img, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      setImgSize({ width: img.width, height: img.height });
     };
   }, [image]);
 
+  // Перерисовываем изображение на canvas при изменении image или размера
+  useEffect(() => {
+    const img = new window.Image();
+    img.src = image;
+    img.onload = () => {
+      const ctx = canvasRef.current.getContext('2d');
+      ctx.clearRect(0, 0, img.width, img.height);
+      ctx.drawImage(img, 0, 0, img.width, img.height);
+    };
+  }, [image, imgSize.width, imgSize.height]);
+
+  // Очищаем маску только при смене изображения или размера
   useEffect(() => {
     const maskCtx = maskRef.current.getContext('2d');
-    maskCtx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    maskCtx.clearRect(0, 0, imgSize.width, imgSize.height);
     onMaskChange(maskRef.current.toDataURL('image/png'));
     // eslint-disable-next-line
-  }, [image]);
+  }, [image, imgSize.width, imgSize.height]);
 
   const getPos = (e) => {
     const rect = maskRef.current.getBoundingClientRect();
     let x, y;
     if (e.touches) {
-      x = ((e.touches[0].clientX - rect.left) / rect.width) * CANVAS_WIDTH;
-      y = ((e.touches[0].clientY - rect.top) / rect.height) * CANVAS_HEIGHT;
+      x = ((e.touches[0].clientX - rect.left) / rect.width) * imgSize.width;
+      y = ((e.touches[0].clientY - rect.top) / rect.height) * imgSize.height;
     } else {
-      x = (e.nativeEvent.offsetX / rect.width) * CANVAS_WIDTH;
-      y = (e.nativeEvent.offsetY / rect.height) * CANVAS_HEIGHT;
+      x = (e.nativeEvent.offsetX / rect.width) * imgSize.width;
+      y = (e.nativeEvent.offsetY / rect.height) * imgSize.height;
     }
     return { x, y };
   };
@@ -71,21 +79,25 @@ function ImageMaskCanvas({ image, onMaskChange, brushSize = 32 }) {
     setLastPos(pos);
   };
 
+  // Для адаптивного отображения (вписываем canvas в контейнер, но сохраняем реальный размер)
+  const maxDisplayWidth = 400;
+  const scale = imgSize.width > maxDisplayWidth ? maxDisplayWidth / imgSize.width : 1;
+
   return (
-    <div style={{ position: 'relative', width: CANVAS_WIDTH, height: CANVAS_HEIGHT, margin: '20px auto' }}>
+    <div style={{ position: 'relative', width: imgSize.width * scale, height: imgSize.height * scale, margin: '20px auto' }}>
       <canvas
         ref={canvasRef}
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
-        style={{ position: 'absolute', left: 0, top: 0, zIndex: 1, border: '1px solid #ccc' }}
+        width={imgSize.width}
+        height={imgSize.height}
+        style={{ position: 'absolute', left: 0, top: 0, zIndex: 1, border: '1px solid #ccc', width: imgSize.width * scale, height: imgSize.height * scale }}
         tabIndex={-1}
         aria-label="background"
       />
       <canvas
         ref={maskRef}
-        width={CANVAS_WIDTH}
-        height={CANVAS_HEIGHT}
-        style={{ position: 'absolute', left: 0, top: 0, zIndex: 2, pointerEvents: 'auto' }}
+        width={imgSize.width}
+        height={imgSize.height}
+        style={{ position: 'absolute', left: 0, top: 0, zIndex: 2, pointerEvents: 'auto', width: imgSize.width * scale, height: imgSize.height * scale }}
         onMouseDown={startDraw}
         onMouseUp={endDraw}
         onMouseOut={endDraw}

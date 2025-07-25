@@ -33,7 +33,7 @@ const INPAINT_AREAS = [
 function App() {
   const [image, setImage] = useState(null);
   const [prompt, setPrompt] = useState('');
-  const [negativePrompt, setNegativePrompt] = useState('');
+  const [negativePrompt, setNegativePrompt] = useState('(deformed, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation');
   const [mask, setMask] = useState(null);
   const [sampler, setSampler] = useState('Euler a');
   const [schedule, setSchedule] = useState('Karras');

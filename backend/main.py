@@ -23,7 +23,7 @@ async def inpaint(
     image: UploadFile = File(...),
     mask: UploadFile = File(...),
     prompt: str = Form(...),
-    negative_prompt: str = Form(""),
+    negative_prompt: str = Form("(deformed, distorted, disfigured:1.3), poorly drawn, bad anatomy, wrong anatomy, extra limb, missing limb, floating limbs, (mutated hands and fingers:1.4), disconnected limbs, mutation, mutated, ugly, disgusting, blurry, amputation"),
     sampler_name: str = Form("Euler a"),
     schedule_type: str = Form("Karras"),
     steps: int = Form(50),
