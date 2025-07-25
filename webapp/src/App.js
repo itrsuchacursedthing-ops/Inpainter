@@ -294,6 +294,13 @@ function App() {
           <Button
             variant="outlined"
             sx={{ mt: 2, mr: 2 }}
+            onClick={() => window.open(`data:image/png;base64,${result}`, '_blank')}
+          >
+            Открыть в браузере
+          </Button>
+          <Button
+            variant="outlined"
+            sx={{ mt: 2, mr: 2 }}
             component="a"
             href={`data:image/png;base64,${result}`}
             download="inpaint_result.png"
