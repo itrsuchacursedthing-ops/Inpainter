@@ -56,7 +56,7 @@ function App() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  const BACKEND_URL = 'https://user393659773-wgkkxhmo.tunnel.vk-apps.com';
+  const BACKEND_URL = 'https://pliantly-key-drum.cloudpub.ru';
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
