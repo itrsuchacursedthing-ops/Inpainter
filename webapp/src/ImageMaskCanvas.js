@@ -97,15 +97,25 @@ function ImageMaskCanvas({ image, onMaskChange, brushSize = 32 }) {
         ref={maskRef}
         width={imgSize.width}
         height={imgSize.height}
-        style={{ position: 'absolute', left: 0, top: 0, zIndex: 2, pointerEvents: 'auto', width: imgSize.width * scale, height: imgSize.height * scale, opacity: 0.4 }}
+        style={{ 
+          position: 'absolute', 
+          left: 0, 
+          top: 0, 
+          zIndex: 2, 
+          pointerEvents: 'auto', 
+          width: imgSize.width * scale, 
+          height: imgSize.height * scale, 
+          opacity: 0.4,
+          touchAction: 'none' // Предотвращаем скролл и зум
+        }}
         onMouseDown={startDraw}
         onMouseUp={endDraw}
         onMouseOut={endDraw}
         onMouseMove={handleMove}
-        onTouchStart={e => { e.preventDefault(); startDraw(e); }}
-        onTouchEnd={e => { e.preventDefault(); endDraw(e); }}
-        onTouchCancel={e => { e.preventDefault(); endDraw(e); }}
-        onTouchMove={e => { e.preventDefault(); handleMove(e); }}
+        onTouchStart={startDraw}
+        onTouchEnd={endDraw}
+        onTouchCancel={endDraw}
+        onTouchMove={handleMove}
         tabIndex={-1}
         aria-label="mask"
       />

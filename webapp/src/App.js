@@ -33,6 +33,14 @@ const INPAINT_AREAS = [
 const tg = window.Telegram?.WebApp;
 const chat_id = tg?.initDataUnsafe?.user?.id;
 
+// Функция fetch с таймаутом
+function fetchWithTimeout(url, options, timeout = 60000) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeout);
+  return fetch(url, { ...options, signal: controller.signal })
+    .finally(() => clearTimeout(id));
+}
+
 function App() {
   const [image, setImage] = useState(null);
   const [prompt, setPrompt] = useState('');
@@ -61,10 +69,11 @@ function App() {
   const [progress, setProgress] = useState(null);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  let progressInterval = null;
+  const [showManualResultButton, setShowManualResultButton] = useState(false);
+  const progressInterval = useRef(null);
+  const isMounted = useRef(true);
 
-  const BACKEND_URL = 'https://pliantly-key-drum.cloudpub.ru';
-
+  const BACKEND_URL = 'https://stunningly-debonair-lanternfish.cloudpub.ru'
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -82,29 +91,170 @@ function App() {
     setMaskKey(prev => prev + 1);
   };
 
+  // Функция для получения результата генерации
+  const fetchResult = async () => {
+    try {
+      console.log('Пытаемся получить результат генерации...');
+      const resp = await fetch(`${BACKEND_URL}/result`, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(10000) // 10 секунд таймаут
+      });
+      
+      if (resp.ok) {
+        const data = await resp.json();
+        console.log('Получен результат:', data);
+        if (data.images && data.images.length > 0) {
+          setResult(data.images[0]);
+          console.log('Результат установлен успешно');
+          return true;
+        }
+      }
+      return false;
+    } catch (err) {
+      console.log('Ошибка получения результата:', err);
+      return false;
+    }
+  };
+
   const startProgressPolling = () => {
-    progressInterval = setInterval(async () => {
+    console.log('Запускаем polling прогресса...');
+    stopProgressPolling();
+    
+    let retryCount = 0;
+    const maxRetries = 10; // Увеличиваем количество попыток
+    let lastProgress = 0;
+    let consecutiveErrors = 0;
+    
+    progressInterval.current = setInterval(async () => {
+      if (!isMounted.current) return; // Проверяем, что компонент всё ещё смонтирован
       try {
         const resp = await fetch(`${BACKEND_URL}/progress`);
         const data = await resp.json();
-        setProgress(Math.round((data.progress || 0) * 100));
-      } catch {
-        setProgress(null);
+        if (isMounted.current) { // Дополнительная проверка перед setState
+          const progressValue = Math.round((data.progress || 0) * 100);
+          setProgress(progressValue);
+          console.log('Прогресс:', progressValue + '%');
+          retryCount = 0; // Сбрасываем счетчик при успешном запросе
+          consecutiveErrors = 0; // Сбрасываем счетчик последовательных ошибок
+          
+          // Если прогресс достиг 100%, пытаемся получить результат
+          if (progressValue >= 100 && lastProgress < 100) {
+            console.log('Генерация завершена, получаем результат...');
+            setTimeout(async () => {
+              const success = await fetchResult();
+              if (success) {
+                stopProgressPolling();
+                setLoading(false);
+                setShowManualResultButton(false);
+              } else {
+                // Если не удалось получить результат, показываем кнопку ручного получения
+                console.log('Не удалось получить результат, показываем кнопку ручного получения...');
+                setShowManualResultButton(true);
+              }
+            }, 2000); // Ждём 2 секунды перед запросом результата
+          }
+          lastProgress = progressValue;
+        }
+      } catch (err) {
+        console.log('Ошибка polling:', err);
+        retryCount++;
+        consecutiveErrors++;
+        
+        // Если много последовательных ошибок, увеличиваем интервал
+        if (consecutiveErrors > 5) {
+          console.log('Много ошибок подряд, увеличиваем интервал polling...');
+          clearInterval(progressInterval.current);
+          progressInterval.current = setInterval(arguments.callee, 3000); // 3 секунды вместо 1
+          consecutiveErrors = 0;
+        }
+        
+        if (retryCount >= maxRetries) {
+          console.log('Превышено количество попыток, останавливаем polling');
+          if (isMounted.current) {
+            setProgress(null);
+            setLoading(false);
+            alert('Соединение с сервером потеряно. Попробуйте запустить генерацию снова.');
+          }
+          stopProgressPolling();
+          return;
+        }
+        
+        console.log(`Попытка переподключения ${retryCount}/${maxRetries}`);
+        if (isMounted.current) {
+          setProgress(null);
+        }
       }
     }, 1000);
   };
 
   const stopProgressPolling = () => {
-    clearInterval(progressInterval);
-    setProgress(null);
+    console.log('Останавливаем polling прогресса...');
+    if (progressInterval.current) {
+      clearInterval(progressInterval.current);
+      progressInterval.current = null;
+    }
+    if (isMounted.current) {
+      setProgress(null);
+    }
+  };
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+      stopProgressPolling();
+    };
+  }, []);
+
+  // Функция проверки доступности сервера
+  const checkServerAvailability = async () => {
+    try {
+      const resp = await fetch(`${BACKEND_URL}/progress`, { 
+        method: 'GET',
+        signal: AbortSignal.timeout(5000) // 5 секунд таймаут
+      });
+      return resp.ok;
+    } catch (err) {
+      console.log('Сервер недоступен:', err);
+      return false;
+    }
+  };
+
+  const handleManualResultFetch = async () => {
+    console.log('Ручное получение результата...');
+    const success = await fetchResult();
+    if (success) {
+      setShowManualResultButton(false);
+      setLoading(false);
+      stopProgressPolling();
+    } else {
+      alert('Результат пока не готов. Попробуйте позже.');
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Дополнительная защита от повторных отправок
+    if (loading) {
+      console.log('Запрос заблокирован: уже идёт генерация');
+      return;
+    }
+    
+    console.log('Начинаем генерацию...');
+    
+    // Проверяем доступность сервера перед отправкой
+    const serverAvailable = await checkServerAvailability();
+    if (!serverAvailable) {
+      alert('Сервер недоступен. Проверьте, что backend запущен и туннель активен.');
+      return;
+    }
+    
     setLoading(true);
     setResult(null);
     setProgress(0);
-    startProgressPolling();
+    setShowManualResultButton(false); // Сбрасываем состояние кнопки
+    
     const formData = new FormData();
     function dataURLtoBlob(dataurl) {
       var arr = dataurl.split(','), mime = arr[0].match(/:(.*?);/)[1], bstr = atob(arr[1]), n = bstr.length, u8arr = new Uint8Array(n);
@@ -133,23 +283,83 @@ function App() {
     formData.append('inpaint_full_res', inpaintArea);
     formData.append('inpaint_full_res_padding', inpaintPadding);
     formData.append('seed', seed);
+    
+    // Логируем все данные для диагностики
+    console.log('Отправляемые данные:');
+    console.log('- prompt:', prompt);
+    console.log('- negative_prompt:', negativePrompt);
+    console.log('- sampler_name:', sampler);
+    console.log('- schedule_type:', schedule);
+    console.log('- steps:', steps, typeof steps);
+    console.log('- cfg_scale:', cfgScale, typeof cfgScale);
+    console.log('- denoising_strength:', denoising, typeof denoising);
+    console.log('- seed:', seed, typeof seed);
+    console.log('- width:', width, typeof width);
+    console.log('- height:', height, typeof height);
+    console.log('- batch_count:', batchCount, typeof batchCount);
+    console.log('- batch_size:', batchSize, typeof batchSize);
+    console.log('- resize_mode:', resizeMode, typeof resizeMode);
+    console.log('- mask_blur:', maskBlur, typeof maskBlur);
+    console.log('- inpainting_mask_invert:', maskMode, typeof maskMode);
+    console.log('- inpainting_fill:', maskedContent, typeof maskedContent);
+    console.log('- inpaint_full_res:', inpaintArea, typeof inpaintArea);
+    console.log('- inpaint_full_res_padding:', inpaintPadding, typeof inpaintPadding);
+    
     try {
-      const resp = await fetch(`${BACKEND_URL}/inpaint`, {
+      console.log('Отправляем запрос на генерацию...');
+      // Сначала отправляем запрос
+      const resp = await fetchWithTimeout(`${BACKEND_URL}/inpaint`, {
         method: 'POST',
         body: formData
-      });
+      }, 300000); // 5 минут таймаут (300 секунд)
+      
+      console.log('Запрос отправлен успешно, запускаем polling...');
+      // Только после успешной отправки запускаем polling
+      if (isMounted.current) {
+        startProgressPolling();
+      }
+      
       const data = await resp.json();
-      if (data.images && data.images.length > 0) {
-        setResult(data.images[0]);
-      } else {
-        setResult(null);
-        alert('Ошибка генерации');
+      console.log('Получен ответ от сервера:', data);
+      if (isMounted.current) {
+        if (data.images && data.images.length > 0) {
+          setResult(data.images[0]);
+          console.log('Генерация завершена успешно');
+        } else {
+          setResult(null);
+          console.log('Ошибка: нет изображений в ответе');
+          alert('Ошибка генерации');
+        }
       }
     } catch (err) {
-      alert('Ошибка: ' + err);
+      console.error('Ошибка при генерации:', err);
+      if (isMounted.current) {
+        if (err.name === 'AbortError') {
+          console.log('Таймаут запроса - SD может всё ещё генерировать');
+          // При таймауте не останавливаем генерацию, а запускаем polling
+          if (isMounted.current) {
+            startProgressPolling();
+            alert('Запрос отправлен. Генерация может занять время. Следите за прогрессом.');
+          }
+        } else if (err.message === 'Failed to fetch' || err.message.includes('ERR_CONNECTION_RESET')) {
+          console.log('Соединение прервано, но SD может продолжать работать');
+          // При обрыве соединения запускаем polling для проверки прогресса
+          if (isMounted.current) {
+            startProgressPolling();
+            alert('Соединение прервано, но генерация может продолжаться. Следите за прогрессом.');
+          }
+        } else {
+          console.log('Другая ошибка:', err.message);
+          alert('Ошибка: ' + err);
+        }
+      }
     }
-    setLoading(false);
-    stopProgressPolling();
+    
+    console.log('Завершаем обработку запроса, loading = false');
+    if (isMounted.current) {
+      setLoading(false);
+      stopProgressPolling();
+    }
   };
 
   const handleSendToTelegram = async () => {
@@ -197,13 +407,13 @@ function App() {
           <Box component="form" onSubmit={handleSubmit} sx={{ mt: 2 }}>
             <Typography variant="h6" gutterBottom>Параметры генерации</Typography>
             <Grid container spacing={2}>
-              <Grid item xs={12}>
+              <Grid>
                 <TextField label="Позитивный промпт" value={prompt} onChange={e=>setPrompt(e.target.value)} fullWidth size="small" margin="dense" />
               </Grid>
-              <Grid item xs={12}>
+              <Grid>
                 <TextField label="Негативный промпт" value={negativePrompt} onChange={e=>setNegativePrompt(e.target.value)} fullWidth size="small" margin="dense" />
               </Grid>
-              <Grid item xs={6}>
+              <Grid>
                 <FormControl fullWidth size="small">
                   <FormLabel>Sampler</FormLabel>
                   <Select value={sampler} onChange={e=>setSampler(e.target.value)}>
@@ -211,7 +421,7 @@ function App() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={6}>
+              <Grid>
                 <FormControl fullWidth size="small">
                   <FormLabel>Schedule</FormLabel>
                   <Select value={schedule} onChange={e=>setSchedule(e.target.value)}>
@@ -219,15 +429,15 @@ function App() {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={4}><TextField label="Steps" type="number" value={steps} onChange={e=>setSteps(Number(e.target.value))} size="small" fullWidth /></Grid>
-              <Grid item xs={4}><TextField label="CFG" type="number" value={cfgScale} onChange={e=>setCfgScale(Number(e.target.value))} size="small" fullWidth /></Grid>
-              <Grid item xs={4}><TextField label="Denoising" type="number" value={denoising} onChange={e=>setDenoising(Number(e.target.value))} size="small" fullWidth /></Grid>
-              <Grid item xs={6}><TextField label="Batch count" type="number" value={batchCount} onChange={e=>setBatchCount(Number(e.target.value))} size="small" fullWidth /></Grid>
-              <Grid item xs={6}><TextField label="Batch size" type="number" value={batchSize} onChange={e=>setBatchSize(Number(e.target.value))} size="small" fullWidth /></Grid>
-              <Grid item xs={6}><TextField label="Width" type="number" value={width} onChange={e=>setWidth(Number(e.target.value))} size="small" fullWidth /></Grid>
-              <Grid item xs={6}><TextField label="Height" type="number" value={height} onChange={e=>setHeight(Number(e.target.value))} size="small" fullWidth /></Grid>
-              <Grid item xs={12}><Divider sx={{ my: 1 }} /></Grid>
-              <Grid item xs={12}>
+              <Grid><TextField label="Steps" type="number" value={steps} onChange={e=>setSteps(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid><TextField label="CFG" type="number" value={cfgScale} onChange={e=>setCfgScale(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid><TextField label="Denoising" type="number" value={denoising} onChange={e=>setDenoising(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid><TextField label="Batch count" type="number" value={batchCount} onChange={e=>setBatchCount(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid><TextField label="Batch size" type="number" value={batchSize} onChange={e=>setBatchSize(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid><TextField label="Width" type="number" value={width} onChange={e=>setWidth(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid><TextField label="Height" type="number" value={height} onChange={e=>setHeight(Number(e.target.value))} size="small" fullWidth /></Grid>
+              <Grid><Divider sx={{ my: 1 }} /></Grid>
+              <Grid>
                 <FormControl component="fieldset">
                   <FormLabel>Resize mode</FormLabel>
                   <RadioGroup row value={resizeMode} onChange={e=>setResizeMode(Number(e.target.value))}>
@@ -237,11 +447,11 @@ function App() {
                   </RadioGroup>
                 </FormControl>
               </Grid>
-              <Grid item xs={12}>
+              <Grid>
                 <Typography gutterBottom>Mask blur: {maskBlur}</Typography>
                 <Slider min={0} max={64} value={maskBlur} onChange={e=>setMaskBlur(Number(e.target.value))} />
               </Grid>
-              <Grid item xs={12}>
+              <Grid>
                 <FormControl component="fieldset">
                   <FormLabel>Mask mode</FormLabel>
                   <RadioGroup row value={maskMode} onChange={e=>setMaskMode(Number(e.target.value))}>
@@ -251,7 +461,7 @@ function App() {
                   </RadioGroup>
                 </FormControl>
               </Grid>
-              <Grid item xs={12}>
+              <Grid>
                 <FormControl component="fieldset">
                   <FormLabel>Masked content</FormLabel>
                   <RadioGroup row value={maskedContent} onChange={e=>setMaskedContent(Number(e.target.value))}>
@@ -261,7 +471,7 @@ function App() {
                   </RadioGroup>
                 </FormControl>
               </Grid>
-              <Grid item xs={12}>
+              <Grid>
                 <FormControl component="fieldset">
                   <FormLabel>Inpaint area</FormLabel>
                   <RadioGroup row value={inpaintArea} onChange={e=>setInpaintArea(e.target.value === 'true')}>
@@ -271,18 +481,39 @@ function App() {
                   </RadioGroup>
                 </FormControl>
               </Grid>
-              <Grid item xs={12}>
+              <Grid>
                 <Typography gutterBottom>Only masked padding, pixels: {inpaintPadding}</Typography>
                 <Slider min={0} max={128} value={inpaintPadding} onChange={e=>setInpaintPadding(Number(e.target.value))} />
               </Grid>
-              <Grid item xs={12}>
+              <Grid>
                 <TextField label="Seed" type="number" value={seed} onChange={e=>setSeed(Number(e.target.value))} size="small" fullWidth helperText="-1 для случайного" />
               </Grid>
-              <Grid item xs={12}>
-                <Button type="submit" variant="contained" color="primary" fullWidth disabled={!image || !mask || !prompt || loading} sx={{ mt: 2 }}>
+              <Grid>
+                <Button 
+                  type="submit" 
+                  variant="contained" 
+                  color="primary" 
+                  fullWidth 
+                  disabled={!image || !mask || !prompt || loading} 
+                  sx={{ mt: 2 }}
+                  onClick={() => console.log('Кнопка нажата, loading =', loading)}
+                >
                   {loading ? `Генерация...${progress !== null ? ` ${progress}%` : ''}` : 'Отправить на инпейнтинг'}
                 </Button>
               </Grid>
+              {showManualResultButton && (
+                <Grid>
+                  <Button 
+                    variant="outlined" 
+                    color="secondary" 
+                    fullWidth 
+                    onClick={handleManualResultFetch}
+                    sx={{ mt: 1 }}
+                  >
+                    Получить результат вручную
+                  </Button>
+                </Grid>
+              )}
             </Grid>
           </Box>
         </>
